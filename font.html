@@ -1,0 +1,1552 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+"http://www.w3.org/TR/html4/strict.dtd">
+<html lang="en">
+  <head>
+	<title>Seven Transistor Laboratories, LLC: Font Encoder</title>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	<meta name=viewport content="width=device-width, initial-scale=1">
+	<style type="text/css" media=all><!--
+
+body {
+	font-family: Verdana, Arial, sans-serif;
+	line-height: 130%;
+}
+
+h1 {
+	text-align: center;
+	line-height: 130%;
+}
+
+canvas {
+	border: 1px solid #404040;
+}
+
+p.fig {
+	margin-left: auto;
+	margin-right: auto;
+}
+
+p.messagebox {
+	color: #e00000;
+}
+
+span.tt {
+	font-family: Consolas, Courier, monospace;
+	background-color: #ececec;
+}
+
+li {
+	padding-bottom: 0.25em;
+}
+
+div {
+	padding-bottom: 0.5em;
+	margin-left: 5%;
+	margin-right: 10%;
+}
+
+div.div {
+	margin: 0%;
+}
+
+div.inl {
+	display: inline;
+	margin-left: 0%;
+	margin-right: 0%;
+}
+
+div.options {
+	line-height: 150%;
+}
+
+pre {
+	line-height: 115%;
+	background-color: #f8f8f8;
+	color: #606060;
+	border: solid 1px #000000;
+	padding: 2px;
+}
+
+pre.code {
+	max-width: 70em;
+	height: 30em;
+	overflow: scroll;
+}
+
+pre.ex {
+	margin-left: 5%;
+	margin-right: 5%;
+}
+
+input[type=file] {
+	border: 1px solid #404040;
+	padding: 4px;
+}
+
+input[type=button] {
+	margin-top: 0.5em;
+}
+
+input[type=text] {
+	width: 10em;
+}
+
+input[type=number] {
+	width: 6em;
+}
+
+table {
+	width: 100%;
+}
+
+	--></style>
+  </head>
+  <body>
+	<h1>Bitmap Font Encoder</h1>
+	<div class="inputs">
+	  <p>Enter a file here:</p>
+	  <input type="file" id="filein">
+	  <input type="button" value="Submit" id="submit">
+	  <p class="messagebox" id="messagebox"></p>
+	</div>
+	<div class="graphics">
+	  <h2>Input Data</h2>
+	  <canvas width="100" height="100" id="image">Select an Image</canvas>
+	  <p id="inputmessage"></p>
+	  <p class="messagebox" id="inputwarning"></p>
+	</div>
+	<div class="options">
+	  <h2>Output Data</h2>
+	  <table><tbody><tr>
+		<td>
+		  Encoder:
+		  <div>
+			<label><input type="radio" name="encodertype" checked>Raw</label><br>
+			<label><input type="radio" name="encodertype">Packed Nibbles</label><br>
+			<label><input type="radio" name="encodertype">(1, 2, 6) Huffman Code</label><br>
+			<label><input type="radio" name="encodertype">Arithmetic Code, DWORDs</label><br>
+			<label><input type="radio" name="encodertype">Arithmetic Code, Stream, Fixed Model</label><br>
+			<label><input type="radio" name="encodertype">Arithmetic Code, Stream, Adaptive Model</label>
+		  </div>
+		  Direction and Grouping:
+		  <div>
+			<label><input type="radio" name="encoderows" checked>Individual Rows</label><br>
+			<label><input type="radio" name="encoderows">Blocks, Row First</label><br>
+			<label><input type="radio" name="encoderows">Blocks, Column First</label>
+		  </div>
+		</td><td>
+		  Metadata:
+		  <div>
+			<label><input type="checkbox" id="packwidths" checked>Pack Widths if Possible</label><br>
+			<label><input type="checkbox" id="packlengths" checked>Pack Lengths if Possible</label><br>
+		  </div>
+		  <br>Output Format:
+		  <div>
+			<label><input type="radio" name="outputtype" checked>Verbose (Text)</label><br>
+			<label><input type="radio" name="outputtype">C Header</label><br>
+			<label><input type="radio" name="outputtype">Binary</label><br>
+		  </div>
+		  <div><label>File name: <input type="text" id="filenamebox"></label></div>
+		</td>
+	  </tr></tbody></table>
+	</div>
+	<div class="outputs">
+	  <p id="outputmessage"></p>
+	  <pre class="code" id="output"></pre>
+	  <input type="button" value="Download" id="download" disabled>
+	  <table><tbody>
+		<tr><td style="padding-top: 2ex;">Decoded result:</td></tr>
+		<tr><td><canvas width="100" height="100" id="decoded">Decoded Image</canvas></td></tr>
+		<tr><td style="padding-top: 1ex;">Inspect Characters:</td></tr>
+		<tr><td><canvas width="100" height="100" id="character">Character</canvas></td></tr>
+		<tr><td>
+		  <table style="width: auto;"><tbody>
+			<tr><td style="text-align: right"><label for="characterbox">Index:</label></td><td style="text-align: left">
+		<input type="number" id="characterbox" min="0" max="1" step="1" value="0"></td></tr>
+			<tr><td style="text-align: right"><label for="characterzoom">Scale:</label></td><td style="text-align: left"><input type="number" id="characterzoom" min="1" max="16" step="1" value="1"></td></tr>
+		  </tbody></table>
+		</td></tr>
+	  </tbody></table>
+	</div>
+	<div class="comments">
+	  <h2>Input File Format</h2>
+	  <p>A 2 to 17-color image, containing all the desired glyphs, each with a fiducial marking its width.  An example, Lucidia Sans 10pt, characters 32 to 127:</p>
+	  <p class="fig"><img src="FontLucidia.png" width="561" height="11"></p>
+	  <p class="fig">
+		<img src="FontGuide1.png" width="296" height="419"> &nbsp; &nbsp;
+		<img src="FontGuide2.png" width="307" height="220">
+	  </p>
+	  <p>The left edge of the image is discarded, up to the first fiducial, which marks the zeroth column of the zeroth character.  The next fiducial marks the zeroth column of the next character, and so on.  Image height is taken as character height, uniform for the whole font.  Make sure to crop the image so that no ascenders or descenders are accidentally cut off&mdash;few letters use the full box, check carefully!</p>
+	  <p>The fiducial is always <span class="tt" id="colorvalue">#ff0000</span> (<span id="colorname">red</span>).  It is translated to white (<span class="tt">#ffffff</span>).  The vertical position of the fiducial doesn't matter, nor the number of pixels in the column colored that way.  (TODO: make some way to encode grayscale under the fiducial?)  All other colors: the average ((R + G + B) / 3) is used.  Alpha is not used.  Output is up to 16 shades of grayscale.</p>
+	  <h2>Output File Format</h2>
+	  <ul>
+		<li>TBD</li>
+		</ul>
+	  </ul>
+	  <h2>Options, Notes</h2>
+	  <p><b>Text format:</b> Includes statistics on font metrics, encoding efficiency (compression), etc.</p>
+	  <p><b>C header format:</b> Header contents are <span class="tt">#define</span>d.  All BYTEs are uint8_t, WORDs are uint16_t, etc.</p>
+	  <p>Only the header is given above; the accompanying C code to use it is as follows (as an avr-gcc ROM declaration):</p>
+<pre class="ex">
+#include "Header_Name.h"
+
+#ifdef HEADER_NAME_H_INCLUDED
+//  Place this at the top, or in the common header file:
+const uint8_t ImageData[HEADER_NAME_TOTAL_LEN];
+
+//  Reference this with: drawImage(ImageData, x, y);
+const uint8_t ImageData[] PROGMEM = {
+	(HEADER_NAME_PALETTE_LEN & 0x00ff),
+	HEADER_NAME_PAL,
+	HEADER_NAME_CMDS
+};
+#endif // HEADER_NAME_H_INCLUDED
+</pre>
+	  <p><b>Execution speed:</b> Graphics writes tend to dominate, particularly via serial (SPI or other).  For display controllers with a set-draw-window command having single pixel resolution, whole characters can be drawn at a time, without too much overhead (one window command per character).  If the window can be filled in vertical columns, one window command for a whole line of characters may even do.  If pixels can only be written row-wise, then characters also must be drawn a row at a time, and the font has to be encoded by rows rather than blocks.</p>
+	  <p><b>Compression/Encoding:</b> .</p>
+	  <h2>Future Improvements, Speculation</h2>
+	  <p>Foo?</p>
+	</div>
+	<script src="FileSaver.min.js"></script>
+	<script type="text/javascript"><!--
+
+/*
+ *	Data passed from processFile() to setOutputData() to viewChar() and downloadOutput()
+ */
+
+/**	Loaded image data, in row-major array format, 32-bit RGB  */
+var imgArray;
+/**	Loaded image width and height  */
+var imgWidth, imgHeight;
+/**	Decoded image data for viewChar  */
+var decodedData;
+/**	Output data  */
+var binaryOutput;
+
+/**	Filename of the source image  */
+var fileName = '';
+
+/*
+ *	Constants
+ */
+
+const MIN_COLORS	= 3;			//	Minimum number of colors: needs at least black, white and fid
+const MAX_COLORS	= 17;			//	Warning threshold
+const ERR_COLORS	= 256;			//	Number of colors to fault out immediately
+const FID_COLOR		= 0x0000ff;		//	Fiducial mark, hex value
+const FID_VALUE		= '#ff0000';	//	Fiducial mark, HTML value (also used to update HTML text)
+const FID_NAME		= 'red';		//	Fiducial mark, English name (also used to update HTML text)
+
+const MAGIC_NUMBER			= 0x5453;
+const SIZEOF_MAGIC_NUMBER	= 4;
+const SIZEOF_COORD			= 1;	//	Bytes per coordinate type header fields and command parameters, normal format
+const SIZEOF_COORD_LONG		= 2;	//	Bytes per coordinate type header fields and command parameters, long format
+const SIZEOF_COLOR_PAL		= 1;	//	Bytes per command Color parameter or bitmap data elements (palette mode)
+const SIZEOF_COLOR_HC		= 2;	//	Bytes per command Color parameter or bitmap data elements (high color mode), or palette
+const SIZEOF_INSTR			= 1;	//	Bytes per command instruction
+/*	Byte lengths of commands (bitmap commands: base length; data is additional Len*SIZEOF_COLOR_{PAL|HC} )  */
+const SIZEOF_NOP				= SIZEOF_INSTR;
+const SIZEOF_END				= SIZEOF_INSTR;
+const SIZEOF_POINT				= SIZEOF_INSTR + SIZEOF_COLOR_PAL + SIZEOF_COORD + SIZEOF_COORD;
+const SIZEOF_HORIZ_FLAT_LINE	= SIZEOF_INSTR + SIZEOF_COLOR_PAL + SIZEOF_COORD + SIZEOF_COORD + SIZEOF_COORD;
+const SIZEOF_VERT_FLAT_LINE		= SIZEOF_INSTR + SIZEOF_COLOR_PAL + SIZEOF_COORD + SIZEOF_COORD + SIZEOF_COORD;
+const SIZEOF_FLAT_RECT			= SIZEOF_INSTR + SIZEOF_COLOR_PAL + SIZEOF_COORD + SIZEOF_COORD + SIZEOF_COORD + SIZEOF_COORD;
+const SIZEOF_HORIZ_BITMAP_LINE	= SIZEOF_INSTR + SIZEOF_COORD + SIZEOF_COORD + SIZEOF_COORD;
+const SIZEOF_VERT_BITMAP_LINE	= SIZEOF_INSTR + SIZEOF_COORD + SIZEOF_COORD + SIZEOF_COORD;
+const SIZEOF_BITMAP_RECT		= SIZEOF_INSTR + SIZEOF_COORD + SIZEOF_COORD + SIZEOF_COORD + SIZEOF_COORD;
+
+const SIZEOF_IMAGE_HEADER		= SIZEOF_MAGIC_NUMBER + SIZEOF_COORD + SIZEOF_COORD + SIZEOF_COLOR_PAL;
+
+document.getElementById('submit').addEventListener('click', processFile, true);
+document.getElementById('download').addEventListener('click', downloadOutput, true);
+document.getElementsByName('encodertype').forEach(n => n.addEventListener('click', setOutputData, true));
+//document.getElementsByName('encodertype')[1].addEventListener('click', setOutputData, true);
+//document.getElementsByName('encodertype')[2].addEventListener('click', setOutputData, true);
+//document.getElementsByName('encodertype')[3].addEventListener('click', setOutputData, true);
+document.getElementsByName('encoderows').forEach(n => n.addEventListener('click', setOutputData, true));
+//document.getElementsByName('encoderows')[1].addEventListener('click', setOutputData, true);
+//document.getElementsByName('encoderows')[2].addEventListener('click', setOutputData, true);
+document.getElementsByName('outputtype').forEach(n => n.addEventListener('click', setOutputData, true));
+//document.getElementsByName('outputtype')[1].addEventListener('click', setOutputData, true);
+//document.getElementsByName('outputtype')[2].addEventListener('click', setOutputData, true);
+document.getElementById('packwidths').addEventListener('click', setOutputData, true);
+document.getElementById('packlengths').addEventListener('click', setOutputData, true);
+document.getElementById('filenamebox').addEventListener('change', setOutputData, true);
+document.getElementById('colorvalue').innerHTML = FID_VALUE;
+document.getElementById('colorname').innerHTML = FID_NAME;
+document.getElementById('characterbox').addEventListener('change', viewChar, true);
+document.getElementById('characterzoom').addEventListener('change', viewChar, true);
+
+
+function processFile() {
+	var f = document.getElementById('filein').files;
+	if (f.length != 1) {
+		document.getElementById('messagebox').innerHTML = 'Please select a single image file.';
+		return;
+	}
+	fileName = f[0].name;
+
+	document.getElementById('messagebox').innerHTML = '';
+	imgArray = null;
+	var fr = new FileReader();
+	fr.onload = function () {
+		clearHTML();
+		var img = new Image();
+		img.addEventListener('error', function () {
+			document.getElementById('messagebox').innerHTML = 'Error loading image.';
+		});
+		img.addEventListener('load', function () {
+			var f = fileName.substr(0, fileName.lastIndexOf('.')) || fileName;
+			if (document.getElementsByName('outputtype')[0].checked) {
+				f += ".txt";
+			} else if (document.getElementsByName('outputtype')[1].checked) {
+				f += ".h";
+			} else {	//	if (document.getElementsByName('outputtype')[2].checked)
+				f += ".bin";
+			}
+			document.getElementById('filenamebox').value = f;
+
+			var ctx = document.getElementById('image').getContext('2d');
+			imgWidth = img.naturalWidth; imgHeight = img.naturalHeight;
+			ctx.canvas.width = imgWidth; ctx.canvas.height = imgHeight;
+			ctx.drawImage(img, 0, 0);
+			imgArray = new Uint32Array(imgWidth * imgHeight);
+			var imgD = ctx.getImageData(0, 0, imgWidth, imgHeight).data;
+			for (var i = 0; i < imgWidth * imgHeight; i++) {
+				imgArray[i] = imgD[i * 4] + 256 * (imgD[i * 4 + 1] + imgD[i * 4 + 2] * 256);
+			}
+
+/*			//	To test image loading
+			document.getElementById('output').innerHTML = 'width: ' + imgWidth
+					+ ', height: ' + imgHeight + ', data:\n\n' + Array.from(
+					imgArray, function (x) {
+						return '0x' + (x & 0x00ffffff).toString(16);
+					}).join(', ');
+*/
+			window.setTimeout(setOutputData, 10);
+		});
+		img.src = fr.result;
+	}
+	fr.readAsDataURL(f[0]);
+}
+
+function setOutputData() {
+
+	/*
+	 *	Process the image:
+	 *		Count number of colors
+	 *		Detect fiducials
+	 *		Convert colors to grayscale (convert fiducials to white)
+	 */
+
+	/**	Local copy of imgArray for processing  */
+	var imgData = new Uint8Array(imgWidth * imgHeight);
+	var colors = new Map();
+	var total = 0;
+	var box;
+	var charStarts = [], charWidths = [];
+
+	if (!imgArray || imgArray.length == 0) {
+		document.getElementById('outputmessage').innerHTML = '';
+		return;
+	}
+	document.getElementById('inputmessage').innerHTML = 'Width: ' + imgWidth + ', Height: ' + imgHeight;
+	document.getElementById('inputwarning').innerHTML = '';
+
+	for (var x = 0; x < imgWidth; x++) {
+
+		var fid = false;
+
+		for (var y = 0; y < imgHeight; y++) {
+
+			//	Detect fiducials, translate to white pixels
+			if (imgArray[x + y * imgWidth] == FID_COLOR) {
+				imgData[x + y * imgWidth] = (255 << 16) + (255 << 8) + 255;
+				fid = true;
+			} else {
+				//	Convert to grayscale (average channels)
+				imgData[x + y * imgWidth] = Math.floor( (
+						   (imgArray[x + y * imgWidth] & 0xff)
+						+ ((imgArray[x + y * imgWidth] >>> 8) & 0xff)
+						+ ((imgArray[x + y * imgWidth] >>> 16) & 0xff)
+						) / 3);
+			}
+
+			var o = colors.get(imgData[x + y * imgWidth]);
+			if (o === undefined) {
+				colors.set(imgData[x + y * imgWidth], 1);
+				total++;
+			} else {
+				colors.set(imgData[x + y * imgWidth], o + 1);
+			}
+			if (total >= ERR_COLORS) {
+				document.getElementById('inputmessage').innerHTML += '<br>\nNumber of colors: &gt;' + total;
+				document.getElementById('inputwarning').innerHTML = 'Error: more than ' + ERR_COLORS + ' colors present!';
+				return;
+			}
+
+		}
+
+		if (fid) {
+			//	Found a fiducial on this column
+			charStarts.push(x);
+			if (charStarts.length > 1)
+				charWidths.push(x - charStarts[charStarts.length - 2]);
+		}
+
+	}
+	charWidths.push(imgWidth - charStarts[charStarts.length - 1]);
+
+	document.getElementById('inputmessage').innerHTML += '<br>\nNumber of colors: ' + total;
+	if (total > MAX_COLORS) {
+		document.getElementById('inputwarning').innerHTML = 'Warning: more than ' + MAX_COLORS + ' colors present.<br>\n';
+	}
+	if (total < MIN_COLORS) {
+		document.getElementById('inputwarning').innerHTML = 'Warning: not enough colors present.<br>\n';
+	}
+	if (charStarts.length < 1) {
+		document.getElementById('inputwarning').innerHTML += 'Warning: no ' + FID_NAME + ' (' + FID_VALUE + ') markers found.<br>\n';
+	}
+
+	/*
+	 *	Sort the colors into a palette; map image data to the new palette
+	 */
+	var palette = [];
+	for (var c of colors) {
+		palette.push({ val: c[0], freq: c[1] });
+	}
+	palette.sort((a, b) => {return a.val - b.val});
+	{
+		var indexes = new Uint8Array(256);
+		for (var i = 0; i < palette.length; i++) {
+			indexes[palette[i].val] = i;
+		}
+		for (var i = 0; i < imgWidth * imgHeight; i++) {
+			imgData[i] = indexes[imgData[i]];
+		}
+	}
+
+/*
+ *
+ *	Encode Characters
+ *
+ */
+
+	/**
+	 *	Encoder/decoder function pointers.
+	 *	Assign a set of start (initializer), step (input a byte, outputs
+	 *	a byte whenever) and end (finalizer, flush, etc.) functions to
+	 *	implement an encoding method.
+	 *
+	 *	Properties:
+	 *
+	 *	encodeStart(state, symbols)
+	 *	decodeStart(state, symbols)
+	 *		Initializes state.
+	 *		state: the state vector.  An empty Object is passed in.
+	 *		Suggest assigning properties to it.
+	 *		symbols: an array of {val, freq} objects.
+	 *			val: palette index / pixel value
+	 *			freq: the number of times it occurs in the image
+	 *				Dividing by the total gets PDF, incrementally summing
+	 *				them gets CDF.  Use to calculate weights, entropy, etc.
+	 *			Note that these data must be outputted with the encoded data,
+	 *			for any encoder that uses them.
+	 *
+	 *	encodeStep(input, state, output)
+	 *	decodeStep(input, state)
+	 *		Encoder: processes one symbol, or input byte, using and mutating
+	 *		existing state, optionally outputting byte(s) to the output
+	 *		array using a output.push() call.
+	 *		Decoder: input is an iterator, to draw bytes from as needed.
+	 *		Returns one output byte/symbol per call.
+	 *
+	 *	encodeEnd(state, output)
+	 *		Finalizes the encoder state, flushing any remaining data
+	 *		to the output.
+	 *		decodeEnd is not needed: exactly the dimensions of the
+	 *		image are Step'd over, leaving no extra data.
+	 */
+	var codec;
+	var encodedChars = [];
+
+	if (document.getElementsByName('encodertype')[0].checked) {			//	Raw
+		codec = codecNothing;
+	} else if (document.getElementsByName('encodertype')[1].checked) {	//	Nibbles
+		codec = codecNibble;
+	} else if (document.getElementsByName('encodertype')[2].checked) {	//	Huffman
+		codec = codecHuffman;
+	} else if (document.getElementsByName('encodertype')[3].checked) {	//	Arithmetic DWORDs
+		codec = codecArithD;
+	} else if (document.getElementsByName('encodertype')[4].checked) {	//	Arithmetic Fixed
+		codec = codecArithFixed;
+	} else { // if (document.getElementsByName('encodertype')[5].checked) {	//	Arithmetic Adaptive
+		codec = codecArithAdapt;
+	}
+
+	if (document.getElementsByName('encoderows')[0].checked) {	//	Individual rows
+
+		for (var y = 0; y < imgHeight; y++) {
+			encodedChars.push([]);
+			for (var i = 0; i < charStarts.length; i++) {
+				encodedChars[y].push([]);
+				var encoderState = new Object();
+				codec.encodeStart(encoderState, palette);
+				for (var x = 0; x < charWidths[i]; x++) {
+					codec.encodeStep(imgData[x + charStarts[i] + y * imgWidth], encoderState, encodedChars[y][i]);
+				}
+				codec.encodeEnd(encoderState, encodedChars[y][i]);
+			}
+		}
+
+	} else if (document.getElementsByName('encoderows')[1].checked) {	//	Blocks, row first
+
+		for (var i = 0; i < charStarts.length; i++) {
+			encodedChars.push([]);
+			var encoderState = new Object();
+			codec.encodeStart(encoderState, palette);
+			for (var y = 0; y < imgHeight; y++) {
+				for (var x = 0; x < charWidths[i]; x++) {
+					codec.encodeStep(imgData[x + charStarts[i] + y * imgWidth], encoderState, encodedChars[i]);
+				}
+			}
+			codec.encodeEnd(encoderState, encodedChars[i]);
+		}
+
+	} else {	//	Blocks, column first
+
+		for (var i = 0; i < charStarts.length; i++) {
+			encodedChars.push([]);
+			var encoderState = new Object();
+			codec.encodeStart(encoderState, palette);
+			for (var x = 0; x < charWidths[i]; x++) {
+				for (var y = 0; y < imgHeight; y++) {
+					codec.encodeStep(imgData[x + charStarts[i] + y * imgWidth], encoderState, encodedChars[i]);
+				}
+			}
+			codec.encodeEnd(encoderState, encodedChars[i]);
+		}
+
+	}
+
+/*
+ *
+ *	Decode result and show on output canvas
+ *
+ */
+
+	var decodeWidth = 0;
+	charWidths.forEach(x => (decodeWidth += x));
+	var img = new Uint8ClampedArray(4 * decodeWidth * imgHeight);
+
+	if (document.getElementsByName('encoderows')[0].checked) {	//	Individual rows
+
+		for (var y = 0; y < imgHeight; y++) {
+			for (var i = 0; i < charStarts.length; i++) {
+				var encoderState = new Object();
+				codec.decodeStart(encoderState, palette);
+				var iter = encodedChars[y][i].entries();
+				consumedBytes = 0;
+				for (var x = 0; x < charWidths[i]; x++) {
+					var d = codec.decodeStep(iter, encoderState);
+					img[4 * (y * decodeWidth + x + charStarts[i] - charStarts[0]) + 0] = palette[d].val;
+					img[4 * (y * decodeWidth + x + charStarts[i] - charStarts[0]) + 1] = palette[d].val;
+					img[4 * (y * decodeWidth + x + charStarts[i] - charStarts[0]) + 2] = palette[d].val;
+					img[4 * (y * decodeWidth + x + charStarts[i] - charStarts[0]) + 3] = 255;
+				}
+			}
+		}
+
+	} else if (document.getElementsByName('encoderows')[1].checked) {	//	Blocks, row first
+
+		for (var i = 0; i < charStarts.length; i++) {
+			var encoderState = new Object();
+			codec.decodeStart(encoderState, palette);
+			var iter = encodedChars[i].entries();
+			consumedBytes = 0;
+			for (var y = 0; y < imgHeight; y++) {
+				for (var x = 0; x < charWidths[i]; x++) {
+					var d = codec.decodeStep(iter, encoderState);
+					img[4 * (y * decodeWidth + x + charStarts[i] - charStarts[0]) + 0] = palette[d].val;
+					img[4 * (y * decodeWidth + x + charStarts[i] - charStarts[0]) + 1] = palette[d].val;
+					img[4 * (y * decodeWidth + x + charStarts[i] - charStarts[0]) + 2] = palette[d].val;
+					img[4 * (y * decodeWidth + x + charStarts[i] - charStarts[0]) + 3] = 255;
+				}
+			}
+		}
+
+	} else {	//	Blocks, column first
+
+		for (var i = 0; i < charStarts.length; i++) {
+			var encoderState = new Object();
+			codec.decodeStart(encoderState, palette);
+			var iter = encodedChars[i].entries();
+			consumedBytes = 0;
+			for (var x = 0; x < charWidths[i]; x++) {
+				for (var y = 0; y < imgHeight; y++) {
+					var d = codec.decodeStep(iter, encoderState);
+					img[4 * (y * decodeWidth + x + charStarts[i] - charStarts[0]) + 0] = palette[d].val;
+					img[4 * (y * decodeWidth + x + charStarts[i] - charStarts[0]) + 1] = palette[d].val;
+					img[4 * (y * decodeWidth + x + charStarts[i] - charStarts[0]) + 2] = palette[d].val;
+					img[4 * (y * decodeWidth + x + charStarts[i] - charStarts[0]) + 3] = 255;
+				}
+			}
+		}
+	}
+
+	var ctx = document.getElementById('decoded');
+	ctx.width = decodeWidth; ctx.height = imgHeight;
+	ctx = ctx.getContext('2d');
+	ctx.putImageData(new ImageData(img, decodeWidth, imgHeight), 0, 0);
+	decodedData = {
+		data: img,
+		widths: charWidths,
+		totalWidth: decodeWidth,
+		height: imgHeight
+	};
+
+/*
+ *
+ *	Generate Outputs
+ *
+ */
+
+
+//	calculate total size (for .h, .bin outputs)
+
+	var bytes = 4;
+/*
+			SIZEOF_IMAGE_HEADER
+			+ indices.size * SIZEOF_COLOR_HC
+			+ c.p	* SIZEOF_POINT
+			+ c.hfl	* SIZEOF_HORIZ_FLAT_LINE
+			+ c.vfl	* SIZEOF_VERT_FLAT_LINE
+			+ c.fr	* SIZEOF_FLAT_RECT
+			+ c.hbl	* SIZEOF_HORIZ_BITMAP_LINE	+ c.hblLen	* SIZEOF_COLOR_PAL
+			+ c.vbl	* SIZEOF_VERT_BITMAP_LINE	+ c.vblLen	* SIZEOF_COLOR_PAL
+			+ c.br	* SIZEOF_BITMAP_RECT		+ c.brLen	* SIZEOF_COLOR_PAL
+			+ SIZEOF_END;
+*/
+
+	var f = document.getElementById('filenamebox').value;
+	f = f.substr(0, f.lastIndexOf('.')) || f;
+
+/*
+ *
+ * Verbose (Text)
+ *
+ */
+
+	if (document.getElementsByName('outputtype')[0].checked) {
+		f += ".txt";
+
+		box = 'Header: 0x' + MAGIC_NUMBER.toString(16) + '\n'
+		box += 'Palette entries: ' + palette.length + '\n';
+		box += 'Palette values:\n';
+		for (var i of palette) {
+			box += i.val + ', ';
+		}
+		box = box.slice(0, box.length - 2) + '\n';
+		box += 'Palette occurrences:\n';
+		for (var i of palette) {
+			box += i.freq + ', ';
+		}
+		box = box.slice(0, box.length - 2) + '\n';
+
+		var e = 0;
+		for (var i of palette) {
+			e -= i.freq / (imgWidth * imgHeight) * Math.log(i.freq / (imgWidth * imgHeight)) / Math.LN2;
+		}
+		box += 'Entropy: ' + e.toString().substr(0, 5) + ' bits/pixel\n\n';
+
+		box += 'Font height: ' + imgHeight + '\n';
+		box += 'Characters: ' + charStarts.length + '\n';
+		box += 'Character widths:\n';
+		for (var i of charWidths) {
+			box += i + ', ';
+		}
+		box = box.slice(0, box.length - 2) + '\n\n';
+
+		box += 'Encoded data:\n';
+		for (var i = 0; i < encodedChars.length; i++) {
+			if (document.getElementsByName('encoderows')[0].checked) {	//	Individual rows
+				box += 'Row ' + i + ': ';
+				for (var j = 0; j < encodedChars[i].length; j++) {
+					box += 'char ' + j + ': ';
+					for (var k = 0; k < encodedChars[i][j].length; k++) {
+						box += byteToHex(encodedChars[i][j][k]) + ', ';
+					}
+					box = box.slice(0, box.length - 2) + '; ';
+				}
+				box = box.slice(0, box.length - 2) + '\n';
+			} else {	//	blocks
+				box += 'Char ' + i + ': ';
+				for (var j = 0; j < encodedChars[i].length; j++) {
+					box += byteToHex(encodedChars[i][j]) + ', ';
+				}
+				box = box.slice(0, box.length - 2) + '\n';
+			}
+		}
+
+
+/*
+ *
+ * C Header
+ *
+ */
+
+	} else if (document.getElementsByName('outputtype')[1].checked) {
+		f += ".h";
+
+		var defName = f.substr(0, f.lastIndexOf('.')) || f;
+		//	Replace non-identifier characters (sorry Unicode users)
+		defName = defName.replace(/^[^a-zA-Z_]/, '_').replace(/[^A-Za-z0-9_]/g, '_').toUpperCase();
+
+		var charLengths = [];
+		if (document.getElementsByName('encoderows')[0].checked) {	//	Individual rows
+			for (var i = 0; i < encodedChars.length; i++) {
+				charLengths.push([]);
+				for (var j = 0; j < encodedChars[i].length; j++) {
+					charLengths[i].push(encodedChars[i][j].length);
+				}
+			}
+		} else {	//	Blocks
+			for (var i = 0; i < encodedChars.length; i++) {
+				charLengths.push(encodedChars[i].length);
+			}
+		}
+
+		var widthCharsBpp = 8, lengthCharsBpp = 8;
+
+		box = '';
+		//	Check if packing is possible
+		var l = 0, j = 0;
+		for (var i = 0; i < charWidths.length; i++) {
+			if (charWidths[i] > l) {
+				l = charWidths[i]; j = i;
+			}
+		}
+		box += 'Widest character: ' + l + ' pixels, index: ' + j + '<br>\n';
+		if (l < 16 && document.getElementById('packwidths').checked) {
+			box += 'Packing nibbles<br>\n';
+			widthCharsBpp = 4;
+		} else if (l < 256 && document.getElementById('packwidths').checked) {
+			box += 'Too wide to pack nibbles<br>\n';
+		} if (l >= 256) {
+			box += 'Error: maximum character width exceeds byte size<br>\n';
+		}
+		l = 0; j = 0;
+		if (document.getElementsByName('encoderows')[0].checked) {	//	Individual rows
+			var n = 0;
+			for (var i = 0; i < charLengths.length; i++) {
+				for (var k = 0; k < charLengths[i].length; k++) {
+					if (charLengths[i][k] > l) {
+						l = charLengths[i][k]; j = k; n = i;
+					}
+				}
+			}
+			box += 'Longest character data: ' + l + ' bytes, index: ' + j + ', row: ' + n + '<br>\n';
+		} else {	//	blocks
+			for (var i = 0; i < charWidths.length; i++) {
+				if (charLengths[i] > l) {
+					l = charLengths[i]; j = i;
+				}
+			}
+			box += 'Longest character data: ' + l + ' bytes, index: ' + j + '<br>\n';
+		}
+		if (l < 16 && document.getElementById('packlengths').checked) {
+			box += 'Packing nibbles<br>\n';
+			lengthCharsBpp = 4;
+		} else if (l < 256 && document.getElementById('packlengths').checked) {
+			box += 'Too long to pack nibbles<br>\n';
+		}
+		if (l >= 256) {
+			box += 'Error: maximum character data exceeds byte size<br>\n';
+		}
+		document.getElementById('outputmessage').innerHTML = box;
+
+		box =	  '/*\n'
+				+ ' *  Compressed Font Data\n'
+				+ ' *  Encoder by Tim Williams, 2020-11-19\n'
+				+ ' *  Original: ' + fileName + '\n'
+				+ ' *  Encoded on: ' + new Date() + '\n'
+				+ ' */\n'
+				+ '\n'
+				+ '#ifndef ' + defName + '_H_INCLUDED\n'
+				+ '#define ' + defName + '_H_INCLUDED\n'
+				+ '\n'
+				+ '#define ' + defName + '_MAGIC_NUMBER\t0x' + (MAGIC_NUMBER).toString(16) + '\n'
+				+ '#define ' + defName + '_HEIGHT\t\t' + imgHeight + '\n'
+				+ '#define ' + defName + '_START_CODE\t\t0\t/*  ASCII code at offset 0  */\n'
+				+ '#define ' + defName + '_END_CODE\t\t' + defName + '_START_CODE + '
+						+ (charWidths.length - 1) + '\t/*  ASCII code at ending offset  */\n'
+				+ '#define ' + defName + '_PALETTE_SIZE\t\t'
+						+ palette.length + '\t/*  Size of grayscale palette data  */\n';
+
+		box += '#define ' + defName + '_WIDTHS_SIZE\t\t';
+		if (widthCharsBpp == 4) {			//	4-bit packed
+			box += '((2 + ' + defName + '_END_CODE - ' + defName + '_START_CODE) / 2)';
+		} else if (widthCharsBpp == 8) {	//	unpacked bytes
+			box += '(1 + ' + defName + '_END_CODE - ' + defName + '_START_CODE)';
+		} else {	//	???
+			box += '/*  Unsupported data width  */';
+		}
+		box += '\t/*  Size of array of character widths  */\n';
+		if (widthCharsBpp == 4) {
+			box += '#define ' + defName + '_WIDTHS_PACKED\n';
+		}
+
+		box += '#define ' + defName + '_LENGTHS_SIZE\t\t';
+		if (lengthCharsBpp == 4) {			//	4-bit packed
+			box += '((2 + ' + defName + '_END_CODE - ' + defName + '_START_CODE) / 2)';
+		} else if (lengthCharsBpp == 8) {	//	unpacked bytes
+			box += '(1 + ' + defName + '_END_CODE - ' + defName + '_START_CODE)';
+		} else {	//	???
+			box += '/*  Unsupported data width  */';
+		}
+		box += '\t/*  Size of array(s) of data lengths  */\n';
+		if (lengthCharsBpp == 4) {
+			box += '#define ' + defName + '_LENGTHS_PACKED\n';
+		}
+
+		box += '#define ' + defName + '_DATA_SIZE\t\t'
+				+ arrTreeCount(encodedChars)
+				+ '\t/*  Size of encoded font data  */\n\n';
+
+		//	Palette is in a different format (array of objects) so just do this one by hand
+		box += '#define ' + defName + '_PALETTE\t';
+		var j = 0;
+		for (var i of palette) {
+			if ((j++) % 8 == 0) {
+				box += '\t\\\n\t';
+			}
+			box += byteToHex(i.val) + ', ';
+		}
+		box = box.slice(0, box.length - 2) + '\n\n';
+
+		box += '#define ' + defName + '_CHAR_WIDTHS\t';
+		if (widthCharsBpp == 4) {
+			//	4-bit packed
+			box += arrTreeToString(packNibbles(charWidths));
+		} else if (widthCharsBpp == 8) {
+			//	unpacked bytes
+			box += arrTreeToString(charWidths);
+		} else {
+			//	???
+			box += '/*  Unsupported data width  */';
+		}
+		box += '\n\n';
+
+		if (document.getElementsByName('encoderows')[0].checked) {	//	Individual rows
+			for (var i = 0; i < encodedChars.length; i++) {
+				box += '#define ' + defName + '_DATA_LENGTHS' + i + '\t';
+				if (lengthCharsBpp == 4) {
+					//	4-bit packed
+					box += arrTreeToString(packNibbles(charLengths[i]));
+				} else if (lengthCharsBpp == 8) {
+					//	unpacked bytes
+					box += arrTreeToString(charLengths[i]);
+				} else {
+					//	???
+					box += '/*  Unsupported data width  */';
+				}
+				box += '\n';
+			}
+			box += '\n';
+		} else {	//	blocks
+			box += '#define ' + defName + '_DATA_LENGTHS\t';
+			if (lengthCharsBpp == 4) {
+				//	4-bit packed
+				box += arrTreeToString(packNibbles(charLengths));
+			} else if (lengthCharsBpp == 8) {
+				//	unpacked bytes
+				box += arrTreeToString(charLengths);
+			} else {
+				//	???
+				box += '/*  Unsupported data width  */';
+			}
+			box += '\n\n';
+		}
+
+		if (document.getElementsByName('encoderows')[0].checked) {	//	Individual rows
+			for (var i = 0; i < encodedChars.length; i++) {
+				box += '#define ' + defName + '_FONT_DATA' + i + '\t';
+				box += arrTreeToString(encodedChars[i]) + '\n\n';
+			}
+		} else {	//	blocks
+			box += '#define ' + defName + '_FONT_DATA\t';
+			box += arrTreeToString(encodedChars) + '\n\n';
+		}
+
+		box += '\n\n#endif  //  ' + defName + '_H_INCLUDED\n';
+		//	HTML-dodging hack... remember to put these back before saving to file!
+		box = box.replace(/\<+/g, '&lt;').replace(/\>+/g, '&gt;');
+
+/*
+ *
+ * Binary
+ *
+ */
+
+	} else {	//	if (document.getElementsByName('outputtype')[2].checked)
+		f += ".bin";
+
+		box = 'Binary Size: ' + bytes + '\n';
+
+		var i = 0;
+		binaryOutput = new Uint8Array(bytes);
+		binaryOutput[i++] = (MAGIC_NUMBER >>> 0) & 0xff;
+		binaryOutput[i++] = (MAGIC_NUMBER >>> 8) & 0xff;
+
+	}
+	document.getElementById('filenamebox').value = f;
+
+	document.getElementById('output').innerHTML = box;
+	document.getElementById('download').disabled = false;
+
+	document.getElementById('characterbox').max = charWidths.length - 1;
+	window.setTimeout(viewChar, 10);
+}
+
+function viewChar() {
+
+	var idx = Number.parseInt(document.getElementById('characterbox').value, 10);
+	var zoom = Math.max(Math.min(
+			Number.parseInt(document.getElementById('characterzoom').value, 10),
+			Number.parseInt(document.getElementById('characterzoom').max, 10)),
+			Number.parseInt(document.getElementById('characterzoom').min, 10));
+	var gridAlpha = Math.pow(Math.max(Math.min((zoom - 3) / 4, 1), 0), 2);
+	if (decodedData) {
+		idx = Math.max(Math.min(idx, decodedData.widths.length - 1), 0);
+		var ctx = document.getElementById('character');
+		ctx.width = decodedData.widths[idx] * zoom;
+		ctx.height = decodedData.height * zoom;
+		ctx = ctx.getContext('2d');
+		//	Stretch the character
+		var ch = new Uint8ClampedArray(4 * decodedData.widths[idx] * zoom * decodedData.height * zoom);
+		var offs = 0;
+		for (var i = 0; i < idx; i++) {
+			offs += decodedData.widths[i];
+		}
+		for (var y = 0; y < decodedData.height; y++) {
+			for (var x = 0; x < decodedData.widths[idx]; x++) {
+				var x1, y1;
+				for (var z = 0; z < zoom; z++) {
+					for (var w = 0; w < zoom; w++) {
+						x1 = x * zoom + w;
+						y1 = y * zoom + z;
+						ch[4 * (x1 + y1 * decodedData.widths[idx] * zoom) + 0] =
+								decodedData.data[4 * (offs + x + y * decodedData.totalWidth) + 0];
+						ch[4 * (x1 + y1 * decodedData.widths[idx] * zoom) + 1] =
+								decodedData.data[4 * (offs + x + y * decodedData.totalWidth) + 1];
+						ch[4 * (x1 + y1 * decodedData.widths[idx] * zoom) + 2] =
+								decodedData.data[4 * (offs + x + y * decodedData.totalWidth) + 2];
+						ch[4 * (x1 + y1 * decodedData.widths[idx] * zoom) + 3] =
+								decodedData.data[4 * (offs + x + y * decodedData.totalWidth) + 3];
+					}
+				}
+			}
+		}
+		ctx.globalAlpha = 1.0;
+		ctx.putImageData(new ImageData(ch, decodedData.widths[idx] * zoom, decodedData.height * zoom), 0, 0);
+		if (zoom > 3) {
+			//	Draw grid
+			ctx.globalAlpha = gridAlpha;
+			ctx.strokeStyle = "rgb(0, 0, 0)";
+			for (var y = zoom; y < decodedData.height * zoom; y += zoom) {
+				ctx.moveTo(0.5, y + 0.5); ctx.lineTo(decodedData.widths[idx] * zoom - 0.5, y + 0.5);
+			}
+			for (var x = zoom; x < decodedData.widths[idx] * zoom; x += zoom) {
+				ctx.moveTo(x + 0.5, 0.5); ctx.lineTo(x + 0.5, decodedData.height * zoom - 0.5);
+			}
+			ctx.stroke();
+		}
+	}
+
+}
+
+function downloadOutput() {
+	var f = document.getElementById('filenamebox').value;
+
+	if (document.getElementsByName('outputtype')[2].checked) {	//	Binary
+		saveAs(new Blob([binaryOutput], {type: 'application/octet-stream'}), f);
+	} else {	//	Text, Header
+		var box = document.getElementById('output').innerHTML;
+		box.replace(/&gt;/g, '>').replace(/&lt;/g, '<');
+		saveAs(new Blob([box], {type: 'text/plain;charset=utf-8'}), f);
+	}
+}
+
+function clearHTML() {
+	document.getElementById('messagebox').innerHTML = '';
+	document.getElementById('inputmessage').innerHTML = '';
+	document.getElementById('inputwarning').innerHTML = '';
+	document.getElementById('outputmessage').innerHTML = '';
+	document.getElementById('download').disabled = true;
+
+	var canv = document.getElementById('image');
+	canv.width = 100; canv.height = 100;
+	canv.getContext('2d').clearRect(0, 0, canv.width, canv.height);
+	canv = document.getElementById('decoded');
+	canv.width = 100; canv.height = 100;
+	canv.getContext('2d').clearRect(0, 0, canv.width, canv.height);
+	canv = document.getElementById('character');
+	canv.width = 100; canv.height = 100;
+	canv.getContext('2d').clearRect(0, 0, canv.width, canv.height);
+
+	imgArray = []; imgWidth = 0; imgHeight = 0;
+	binaryOutput = [];
+}
+
+/**
+ *	Converts a 32-bit integer into a formatted hexadecimal string.
+ */
+function dwordToHex(b) {
+	return '0x' + ('00000000' + (b & 0xffffffff).toString(16)).substr(-8);
+}
+
+/**
+ *	Converts a 16-bit integer into a formatted hexadecimal string.
+ */
+function wordToHex(b) {
+	return '0x' + ('0000' + (b & 0xffff).toString(16)).substr(-4);
+}
+
+/**
+ *	Converts an 8-bit integer into a formatted hexadecimal string.
+ */
+function byteToHex(b) {
+	return '0x' + ('00' + (b & 0xff).toString(16)).substr(-2);
+}
+
+/**
+ *	Recursively counts the number of leaf elements (primitives)
+ *	in an array tree.
+ */
+function arrTreeCount(arr) {
+	var n = 0;
+	if (Array.isArray(arr)) {
+		for (var i of arr) {
+			if (Array.isArray(i))
+				n += arrTreeCount(i);
+			else
+				n++;
+		}
+	}
+	return n;
+}
+
+/**
+ *	Recursively converts leaf elements (primitives) in an
+ *	array tree to a nicely formatted comma-separated
+ *	hexadecimal string with C-style line wrapping.
+ */
+function arrTreeToString(arr) {
+	var s = '', j = 0, a = arr.flat().flat().flat().flat();
+	for (var i of a) {
+		if ((j++) % 8 == 0) {
+			s += '\t\\\n\t';
+		}
+		s += byteToHex(i) + ', ';
+	}
+	s = s.slice(0, s.length - 2);
+	return s;
+}
+
+/**
+ *	Packs the given array into alternate nibbles.
+ *	The low 4 bits of arr[i] are used, rest discarded.
+ */
+function packNibbles(arr) {
+	var packed = [];
+	for (var i = 0; i < arr.length; i++) {
+		if (i % 2 == 1) {
+			packed[Math.floor(i / 2)] |= (arr[i] & 0x0f) << 4;
+		} else {
+			packed.push(arr[i] & 0x0f);
+		}
+	}
+	return packed;
+}
+
+/*
+ *
+ *	Encoder Functions
+ *
+ */
+
+/**	Raw encoder  */
+const codecNothing = {
+	encodeStart: function(state, symbols) {			return;							},
+	encodeStep: function(input, state, output) {	output.push(input);				},
+	encodeEnd: function(state, output) {			return;							},
+	decodeStart: function(state, symbols) {			return;							},
+	decodeStep: function(input, state) {			return input.next().value[1];	}
+};
+
+/**	Packed nibbles */
+const codecNibble = {
+	encodeStart: function(state, symbols) {
+		state.index = 0; state.pack = 0;
+	},
+	encodeStep: function(input, state, output) {
+		if (state.index == 0) {		//	Encode low nibble
+			state.pack = input & 0x0f;
+			state.index = 1;
+		} else {					//	Encode high nibble and output
+			output.push(state.pack | (input << 4));
+			state.index = 0;
+		}
+	},
+	encodeEnd: function(state, output) {
+		//	Flush extra nibble if present
+		if (state.index == 1) output.push(state.pack);
+	},
+	decodeStart: function(state, symbols) {
+		state.index = 0; state.pack = 0;
+	},
+	decodeStep: function(input, state) {
+		var b;
+		if (state.index == 0) {		//	Decode low nibble
+			state.pack = input.next().value[1];
+			state.index = 1;
+			return state.pack & 0x0f;
+		} else {					//	Decode high nibble
+			state.index = 0;
+			return (state.pack >>> 4) & 0x0f;
+		}
+	}
+};
+
+
+/**	Modified Huffman encoding, fixed probability  */
+function codecHuffmanStart(state, symbols) {
+	state.bits = 0;
+	state.shifts = 0;
+	//	Find two most likely symbols, assign them the lowest-entropy codes
+	state.sym1 = 0; state.sym2 = 1;
+	for (var f1 = 0, i = 0; i < symbols.length; i++) {
+		if (symbols[i].freq > f1) {
+			f1 = symbols[i].freq;
+			state.sym1 = i;
+		}
+	}
+	for (var f2 = 0, i = 0; i < symbols.length; i++) {
+		if (symbols[i].freq > f2 && symbols[i].freq < f1) {
+			f2 = symbols[i].freq;
+			state.sym2 = i;
+		}
+	}
+	state.codes = [];
+	for (var i = 0; i < symbols.length; i++) {
+		state.codes.push( 0x02 | ((i & 0x0f) << 2));
+	}
+	state.codes[state.sym1] = 0x01;
+	state.codes[state.sym2] = 0x00;
+	state.bitsPerSymbol = [];
+	for (var i = 0; i < symbols.length; i++) {
+		state.bitsPerSymbol.push(6);
+	}
+	state.bitsPerSymbol[state.sym1] = 1;
+	state.bitsPerSymbol[state.sym2] = 2;
+}
+
+const codecHuffman = {
+	encodeStart: codecHuffmanStart,
+	encodeStep: function(input, state, output) {
+		state.bits |= state.codes[input] << state.shifts;
+		state.shifts += state.bitsPerSymbol[input];
+		if (state.shifts >= 8) {
+			output.push(state.bits & 0xff);
+			state.shifts -= 8;
+			state.bits >>>= 8;
+		}
+	},
+	encodeEnd: function(state, output) {
+		while (state.shifts > 0) {
+			output.push(state.bits & 0xff);
+			state.shifts -= 8;
+			state.bits >>>= 8;
+		}
+	},
+	decodeStart: codecHuffmanStart,	//	Same actions as encode
+	decodeStep: function(input, state) {
+		while (state.shifts < 8) {
+			var b = input.next();
+			if (b.done) break;
+			state.bits |= b.value[1] << state.shifts;
+			state.shifts += 8;
+		}
+		var sym;
+		if ((state.bits & ((1 << state.bitsPerSymbol[state.sym1]) - 1)) == state.codes[state.sym1]) {
+			//	Shortest code
+			sym = state.sym1;
+		} else if ((state.bits & ((1 << state.bitsPerSymbol[state.sym2]) - 1)) == state.codes[state.sym2]) {
+			//	Second shortest code
+			sym = state.sym2;
+		} else {	//	Other
+			sym = (state.bits >>> 2) & 0x0f;
+		}
+		state.shifts -= state.bitsPerSymbol[sym]; state.bits >>>= state.bitsPerSymbol[sym];
+		return sym;
+	}
+};
+
+
+/**	Arithmetic encoder, DWORDs  */
+const codecArithD = codecNothing;
+/*
+{
+	encodeStart: function(state, symbols) {
+		return;
+	},
+	encodeStep: function(input, state, output) {
+		output.push(input);
+	},
+	encodeEnd: function(state, output) {
+		return;
+	},
+	decodeStart: function(state, symbols) {
+		return;
+	},
+	decodeStep: function(input, state) {
+		return input.next().value[1];
+	}
+};
+*/
+
+
+/**	Arithmetic encoder, fixed probability  */
+const codecArithFixed = {
+	encodeStart: function(state, symbols) {
+		state.TOP_VALUE	= 0xffff;
+		state.MAX_SCALE	= 0x3fff;
+		state.FIRST_QTR	= (Math.floor(state.TOP_VALUE / 4) + 1);
+		state.HALF		= (2 * state.FIRST_QTR);
+		state.THIRD_QTR	= (3 * state.FIRST_QTR);
+		state.ACODER_N	= symbols.length;
+		state.low		= 0;
+		state.high		= state.TOP_VALUE;
+		state.pending	= 0;
+		state.byte		= 0;
+		state.bit		= 0;
+		state.cdf = [0];
+		for (var i = 1; i < state.ACODER_N + 1; i++) {
+			state.cdf.push(symbols[i - 1].freq + state.cdf[i - 1]);
+		}
+		while (state.cdf[state.cdf.length - 1] >= state.MAX_SCALE) {
+			//	Clamp everything to reasonable values
+			var reduction = (state.MAX_SCALE + 1) / state.cdf[state.cdf.length - 1];
+			for (var i = 0; i < state.ACODER_N; i++) {
+				state.cdf[i] = Math.ceil(state.cdf[i] * reduction);
+			}
+			//	Do an awkward scan just to make sure nothing has disappeared
+			for (var i = 1; i < state.ACODER_N; i++) {
+				if (state.cdf[i] - state.cdf[i - 1] < 1) {
+					for (var j = i; j < state.ACODER_N; j++) {
+						state.cdf[j]++;
+					}
+				}
+			}
+		}
+	},
+
+	encodeStep: function(input, state, output) {
+		var range = state.high - state.low + 1;
+		state.high = Math.floor(state.low + (range * state.cdf[input + 1]) / state.cdf[state.ACODER_N] - 1);
+		state.low  = Math.floor(state.low + (range * state.cdf[input])     / state.cdf[state.ACODER_N]);
+		while (1) {
+			if (state.high < state.HALF) {
+				codecArithAdapt_output_bit_and_pending(state, output, 0);
+			} else if (state.low >= state.HALF) {
+				codecArithAdapt_output_bit_and_pending(state, output, 1);
+				state.low  -= state.HALF;
+				state.high -= state.HALF;
+			} else if (state.low >= state.FIRST_QTR && state.high < state.THIRD_QTR) {
+				state.pending++;
+				state.low  -= state.FIRST_QTR;
+				state.high -= state.FIRST_QTR;
+			} else
+				break;
+			state.low  = state.low * 2;
+			state.high = state.high * 2 + 1;
+		}
+	},
+
+	encodeEnd: function(state, output) {
+		state.pending++;
+		if (state.low < state.FIRST_QTR)
+			codecArithAdapt_output_bit_and_pending(state, output, 0);
+		else
+			codecArithAdapt_output_bit_and_pending(state, output, 1);
+		output.push(state.byte);
+	},
+
+	decodeStart: function(state, symbols) {
+
+		state.TOP_VALUE	= 0xffff;
+		state.MAX_SCALE	= 0x3fff;
+		state.FIRST_QTR	= (Math.floor(state.TOP_VALUE / 4) + 1);
+		state.HALF		= (2 * state.FIRST_QTR);
+		state.THIRD_QTR	= (3 * state.FIRST_QTR);
+		state.ACODER_N	= symbols.length;
+		state.low		= 0;
+		state.high		= state.TOP_VALUE;
+		state.value		= 0;
+		state.bit		= 7;
+		state.firstRun = true;
+
+		state.cdf = [0];
+		for (var i = 1; i < state.ACODER_N + 1; i++) {
+			state.cdf.push(symbols[i - 1].freq + state.cdf[i - 1]);
+		}
+		while (state.cdf[state.cdf.length - 1] > state.TOP_VALUE) {
+			//	Clamp everything to reasonable values
+			var reduction = Math.log(state.cdf[state.cdf.length - 1]) / Math.log(2);
+			for (var i = 0; i < state.ACODER_N; i++) {
+				state.cdf[i] = Math.ceil(state.cdf[i] / reduction);
+			}
+			//	Do an awkward scan just to make sure nothing has disappeared
+			for (var i = 1; i < state.ACODER_N; i++) {
+				if (state.cdf[i] - state.cdf[i - 1] < 1) {
+					for (var j = i; j < state.ACODER_N; j++) {
+						state.cdf[j]++;
+					}
+				}
+			}
+		}
+	},
+
+	decodeStep: function(input, state) {
+
+		//	Moved from decodeStart because it's not passed any input
+		if (state.firstRun) {
+			for (var i = 0; i < 16; i++)
+				state.value = (state.value << 1) | codecArithAdapt_input_bit(state, input);
+			state.firstRun = false;
+		}
+
+		var range = state.high - state.low + 1;
+		var val = Math.floor(((state.value - state.low + 1) * state.cdf[state.ACODER_N] - 1) / range);
+		var b;
+		for (b = state.ACODER_N; val < state.cdf[b]; b--);
+		state.high = Math.floor(state.low + (range * state.cdf[b + 1]) / state.cdf[state.ACODER_N] - 1);
+		state.low  = Math.floor(state.low + (range * state.cdf[b])     / state.cdf[state.ACODER_N]);
+
+		while (1) {
+			if (state.high < state.HALF) {
+				// Do nothing
+			} else if (state.low >= state.HALF) {
+				state.value -= state.HALF;
+				state.low   -= state.HALF;
+				state.high  -= state.HALF;
+			} else if (state.low >= state.FIRST_QTR && state.high < state.THIRD_QTR) {
+				state.value -= state.FIRST_QTR;
+				state.low   -= state.FIRST_QTR;
+				state.high  -= state.FIRST_QTR;
+			} else {
+				break;
+			}
+			state.low   = state.low * 2;
+			state.high  = state.high * 2 + 1;
+			state.value = (state.value << 1) | codecArithAdapt_input_bit(state, input);
+		}
+		return b;
+
+	}
+};
+
+
+/**	Arithmetic encoder, adaptive  */
+/*	See: https://github.com/ataradov/random  */
+const codecArithAdapt = {
+	encodeStart: function(state, symbols) {
+		state.TOP_VALUE	= 0xffff;
+		state.MAX_SCALE	= 0x3fff;
+		state.FIRST_QTR	= (Math.floor(state.TOP_VALUE / 4) + 1);
+		state.HALF		= (2 * state.FIRST_QTR);
+		state.THIRD_QTR	= (3 * state.FIRST_QTR);
+		state.ACODER_N	= symbols.length;
+		state.low		= 0;
+		state.high		= state.TOP_VALUE;
+		state.pending	= 0;
+		state.byte		= 0;
+		state.bit		= 0;
+		state.cdf = [];
+		for (var i = 0; i < state.ACODER_N + 1; i++) {
+			state.cdf.push(i);
+		}
+	},
+
+	encodeStep: function(input, state, output) {
+		var range = state.high - state.low + 1;
+		state.high = Math.floor(state.low + (range * state.cdf[input + 1]) / state.cdf[state.ACODER_N] - 1);
+		state.low  = Math.floor(state.low + (range * state.cdf[input])     / state.cdf[state.ACODER_N]);
+		while (1) {
+			if (state.high < state.HALF) {
+				codecArithAdapt_output_bit_and_pending(state, output, 0);
+			} else if (state.low >= state.HALF) {
+				codecArithAdapt_output_bit_and_pending(state, output, 1);
+				state.low  -= state.HALF;
+				state.high -= state.HALF;
+			} else if (state.low >= state.FIRST_QTR && state.high < state.THIRD_QTR) {
+				state.pending++;
+				state.low  -= state.FIRST_QTR;
+				state.high -= state.FIRST_QTR;
+			} else
+				break;
+			state.low  = state.low * 2;
+			state.high = state.high * 2 + 1;
+		}
+		codecArithAdapt_model_update(state, input);
+	},
+
+	encodeEnd: function(state, output) {
+		state.pending++;
+		if (state.low < state.FIRST_QTR)
+			codecArithAdapt_output_bit_and_pending(state, output, 0);
+		else
+			codecArithAdapt_output_bit_and_pending(state, output, 1);
+		output.push(state.byte);
+	},
+
+	decodeStart: function(state, symbols) {
+
+		state.TOP_VALUE	= 0xffff;
+		state.MAX_SCALE	= 0x3fff;
+		state.FIRST_QTR	= (Math.floor(state.TOP_VALUE / 4) + 1);
+		state.HALF		= (2 * state.FIRST_QTR);
+		state.THIRD_QTR	= (3 * state.FIRST_QTR);
+		state.ACODER_N	= symbols.length;
+		state.low		= 0;
+		state.high		= state.TOP_VALUE;
+		state.value		= 0;
+		state.bit		= 7;
+		state.firstRun = true;
+
+		state.cdf = [];
+		for (var i = 0; i < state.ACODER_N + 1; i++) {
+			state.cdf.push(i);
+		}
+	},
+
+	decodeStep: function(input, state) {
+
+		//	Moved from decodeStart because it's not passed any input
+		if (state.firstRun) {
+			for (var i = 0; i < 16; i++)
+				state.value = (state.value << 1) | codecArithAdapt_input_bit(state, input);
+			state.firstRun = false;
+		}
+
+		var range = state.high - state.low + 1;
+		var val = Math.floor(((state.value - state.low + 1) * state.cdf[state.ACODER_N] - 1) / range);
+		var b;
+		for (b = state.ACODER_N; val < state.cdf[b]; b--);
+		state.high = Math.floor(state.low + (range * state.cdf[b + 1]) / state.cdf[state.ACODER_N] - 1);
+		state.low  = Math.floor(state.low + (range * state.cdf[b])     / state.cdf[state.ACODER_N]);
+
+		while (1) {
+			if (state.high < state.HALF) {
+				// Do nothing
+			} else if (state.low >= state.HALF) {
+				state.value -= state.HALF;
+				state.low   -= state.HALF;
+				state.high  -= state.HALF;
+			} else if (state.low >= state.FIRST_QTR && state.high < state.THIRD_QTR) {
+				state.value -= state.FIRST_QTR;
+				state.low   -= state.FIRST_QTR;
+				state.high  -= state.FIRST_QTR;
+			} else {
+				break;
+			}
+			state.low   = state.low * 2;
+			state.high  = state.high * 2 + 1;
+			state.value = (state.value << 1) | codecArithAdapt_input_bit(state, input);
+		}
+		codecArithAdapt_model_update(state, b);
+		return b;
+
+	}
+};
+//	Helper functions
+function codecArithAdapt_output_bit_and_pending(state, output, bit) {
+	codecArithAdapt_output_bit(state, output, bit);
+	for (; state.pending; state.pending--) {
+		codecArithAdapt_output_bit(state, output, !bit);
+	}
+}
+
+function codecArithAdapt_output_bit(state, output, value) {
+	state.byte |= (value << state.bit);
+	if (8 == ++state.bit) {
+		output.push(state.byte);
+		state.byte = 0;
+		state.bit = 0;
+	}
+}
+
+var consumedBytes = 0;
+
+function codecArithAdapt_input_bit(state, input) {
+	var res;
+
+	state.bit++;
+	if (8 == state.bit) {
+		var b = input.next();
+		if (b.done)
+			state.byte = 0;
+		else
+			state.byte = b.value[1];
+		consumedBytes++;
+		state.bit = 0;
+	}
+
+	res = state.byte & 1;
+	state.byte >>>= 1;
+
+	return res;
+}
+
+function codecArithAdapt_model_update(state, input) {
+	var last = 0;
+	var value = 0;
+
+	if (state.cdf[state.ACODER_N] == state.MAX_SCALE) {
+		for (var i = 0; i < state.ACODER_N; i++) {
+			value = state.cdf[i + 1] - last;
+			last = state.cdf[i + 1];
+			state.cdf[i + 1] = state.cdf[i] + Math.floor((value + 1) / 2);
+		}
+	}
+
+	for (var i = input; i < state.ACODER_N; i++) {
+		state.cdf[i + 1]++;
+	}
+}
+
+
+/*
+//	Copy to add more codecs
+const codec = {
+	encodeStart: function(state, symbols) {
+		return;
+	},
+	encodeStep: function(input, state, output) {
+		output.push(input);
+	},
+	encodeEnd: function(state, output) {
+		return;
+	},
+	decodeStart: function(state, symbols) {
+		return;
+	},
+	decodeStep: function(input, state) {
+		return input.next().value[1];
+	}
+};
+*/
+
+	--></script>
+  </body>
+</html>

@@ -163,7 +163,7 @@ table {
 		  <table style="width: auto;"><tbody>
 			<tr><td style="text-align: right"><label for="characterbox">Index:</label></td><td style="text-align: left">
 		<input type="number" id="characterbox" min="0" max="1" step="1" value="0"></td></tr>
-			<tr><td style="text-align: right"><label for="characterzoom">Scale:</label></td><td style="text-align: left"><input type="number" id="characterzoom" min="1" max="16" step="1" value="1"></td></tr>
+			<tr><td style="text-align: right"><label for="characterzoom">Scale:</label></td><td style="text-align: left"><input type="number" id="characterzoom" min="1" max="16" step="1" value="8"></td></tr>
 		  </tbody></table>
 		</td></tr>
 	  </tbody></table>
@@ -298,11 +298,11 @@ function processFile() {
 		img.addEventListener('load', function () {
 			var f = fileName.substr(0, fileName.lastIndexOf('.')) || fileName;
 			if (document.getElementsByName('outputtype')[0].checked) {
-				f += ".txt";
+				f += '.txt';
 			} else if (document.getElementsByName('outputtype')[1].checked) {
-				f += ".h";
+				f += '.h';
 			} else {	//	if (document.getElementsByName('outputtype')[2].checked)
-				f += ".bin";
+				f += '.bin';
 			}
 			document.getElementById('filenamebox').value = f;
 
@@ -631,6 +631,68 @@ function setOutputData() {
 	var f = document.getElementById('filenamebox').value;
 	f = f.substr(0, f.lastIndexOf('.')) || f;
 
+	var charLengths = [];
+	if (document.getElementsByName('encoderows')[0].checked) {	//	Individual rows
+		for (var i = 0; i < encodedChars.length; i++) {
+			charLengths.push([]);
+			for (var j = 0; j < encodedChars[i].length; j++) {
+				charLengths[i].push(encodedChars[i][j].length);
+			}
+		}
+	} else {	//	Blocks
+		for (var i = 0; i < encodedChars.length; i++) {
+			charLengths.push(encodedChars[i].length);
+		}
+	}
+
+	var widthCharsBpp = 8, lengthCharsBpp = 8;
+	box = '';
+	//	Check if packing is possible
+	var l = 0, j = 0;
+	for (var i = 0; i < charWidths.length; i++) {
+		if (charWidths[i] > l) {
+			l = charWidths[i]; j = i;
+		}
+	}
+	box += 'Widest character: ' + l + ' pixels, index: ' + j + '<br>\n';
+	if (l < 16 && document.getElementById('packwidths').checked) {
+		box += 'Packing nibbles<br>\n';
+		widthCharsBpp = 4;
+	} else if (l < 256 && document.getElementById('packwidths').checked) {
+		box += 'Too wide to pack nibbles<br>\n';
+	} if (l >= 256) {
+		box += 'Error: maximum character width exceeds byte size<br>\n';
+	}
+	l = 0; j = 0;
+	if (document.getElementsByName('encoderows')[0].checked) {	//	Individual rows
+		var n = 0;
+		for (var i = 0; i < charLengths.length; i++) {
+			for (var k = 0; k < charLengths[i].length; k++) {
+				if (charLengths[i][k] > l) {
+					l = charLengths[i][k]; j = k; n = i;
+				}
+			}
+		}
+		box += 'Longest character data: ' + l + ' bytes, index: ' + j + ', row: ' + n + '<br>\n';
+	} else {	//	blocks
+		for (var i = 0; i < charWidths.length; i++) {
+			if (charLengths[i] > l) {
+				l = charLengths[i]; j = i;
+			}
+		}
+		box += 'Longest character data: ' + l + ' bytes, index: ' + j + '<br>\n';
+	}
+	if (l < 16 && document.getElementById('packlengths').checked) {
+		box += 'Packing nibbles<br>\n';
+		lengthCharsBpp = 4;
+	} else if (l < 256 && document.getElementById('packlengths').checked) {
+		box += 'Too long to pack nibbles<br>\n';
+	}
+	if (l >= 256) {
+		box += 'Error: maximum character data exceeds byte size<br>\n';
+	}
+	document.getElementById('outputmessage').innerHTML = box;
+
 /*
  *
  * Verbose (Text)
@@ -638,7 +700,7 @@ function setOutputData() {
  */
 
 	if (document.getElementsByName('outputtype')[0].checked) {
-		f += ".txt";
+		f += '.txt';
 
 		box = 'Header: 0x' + MAGIC_NUMBER.toString(16) + '\n'
 		box += 'Palette entries: ' + palette.length + '\n';
@@ -696,74 +758,11 @@ function setOutputData() {
  */
 
 	} else if (document.getElementsByName('outputtype')[1].checked) {
-		f += ".h";
+		f += '.h';
 
 		var defName = f.substr(0, f.lastIndexOf('.')) || f;
 		//	Replace non-identifier characters (sorry Unicode users)
 		defName = defName.replace(/^[^a-zA-Z_]/, '_').replace(/[^A-Za-z0-9_]/g, '_').toUpperCase();
-
-		var charLengths = [];
-		if (document.getElementsByName('encoderows')[0].checked) {	//	Individual rows
-			for (var i = 0; i < encodedChars.length; i++) {
-				charLengths.push([]);
-				for (var j = 0; j < encodedChars[i].length; j++) {
-					charLengths[i].push(encodedChars[i][j].length);
-				}
-			}
-		} else {	//	Blocks
-			for (var i = 0; i < encodedChars.length; i++) {
-				charLengths.push(encodedChars[i].length);
-			}
-		}
-
-		var widthCharsBpp = 8, lengthCharsBpp = 8;
-
-		box = '';
-		//	Check if packing is possible
-		var l = 0, j = 0;
-		for (var i = 0; i < charWidths.length; i++) {
-			if (charWidths[i] > l) {
-				l = charWidths[i]; j = i;
-			}
-		}
-		box += 'Widest character: ' + l + ' pixels, index: ' + j + '<br>\n';
-		if (l < 16 && document.getElementById('packwidths').checked) {
-			box += 'Packing nibbles<br>\n';
-			widthCharsBpp = 4;
-		} else if (l < 256 && document.getElementById('packwidths').checked) {
-			box += 'Too wide to pack nibbles<br>\n';
-		} if (l >= 256) {
-			box += 'Error: maximum character width exceeds byte size<br>\n';
-		}
-		l = 0; j = 0;
-		if (document.getElementsByName('encoderows')[0].checked) {	//	Individual rows
-			var n = 0;
-			for (var i = 0; i < charLengths.length; i++) {
-				for (var k = 0; k < charLengths[i].length; k++) {
-					if (charLengths[i][k] > l) {
-						l = charLengths[i][k]; j = k; n = i;
-					}
-				}
-			}
-			box += 'Longest character data: ' + l + ' bytes, index: ' + j + ', row: ' + n + '<br>\n';
-		} else {	//	blocks
-			for (var i = 0; i < charWidths.length; i++) {
-				if (charLengths[i] > l) {
-					l = charLengths[i]; j = i;
-				}
-			}
-			box += 'Longest character data: ' + l + ' bytes, index: ' + j + '<br>\n';
-		}
-		if (l < 16 && document.getElementById('packlengths').checked) {
-			box += 'Packing nibbles<br>\n';
-			lengthCharsBpp = 4;
-		} else if (l < 256 && document.getElementById('packlengths').checked) {
-			box += 'Too long to pack nibbles<br>\n';
-		}
-		if (l >= 256) {
-			box += 'Error: maximum character data exceeds byte size<br>\n';
-		}
-		document.getElementById('outputmessage').innerHTML = box;
 
 		box =	  '/*\n'
 				+ ' *  Compressed Font Data\n'
@@ -889,7 +888,7 @@ function setOutputData() {
  */
 
 	} else {	//	if (document.getElementsByName('outputtype')[2].checked)
-		f += ".bin";
+		f += '.bin';
 
 		box = 'Binary Size: ' + bytes + '\n';
 
@@ -952,7 +951,7 @@ function viewChar() {
 		if (zoom > 3) {
 			//	Draw grid
 			ctx.globalAlpha = gridAlpha;
-			ctx.strokeStyle = "rgb(0, 0, 0)";
+			ctx.strokeStyle = 'rgb(0, 0, 0)';
 			for (var y = zoom; y < decodedData.height * zoom; y += zoom) {
 				ctx.moveTo(0.5, y + 0.5); ctx.lineTo(decodedData.widths[idx] * zoom - 0.5, y + 0.5);
 			}
@@ -1194,26 +1193,101 @@ const codecHuffman = {
 
 
 /**	Arithmetic encoder, DWORDs  */
-const codecArithD = codecNothing;
-/*
-{
-	encodeStart: function(state, symbols) {
-		return;
-	},
+function codecArithDStart(state, symbols) {
+	state.MAXVAL = 256;
+	state.accum = 0;
+	state.divisor = 1;
+	state.LOGDEF = state.MAXVAL / 8;	//	Adjusts quality (error at end of DWORD)
+	state.logacc = state.LOGDEF;
+	state.pdf = [];
+	state.cdf = [0];
+	//	Partition the symbols over range 0...MAXVAL using the Huntington-Hill method
+	var total = 0, syms = Math.min(symbols.length, state.MAXVAL);
+	for (var i = 0; i < syms; i++) {
+		state.pdf.push(1);
+		total++;
+	}
+	while (total < state.MAXVAL) {
+		//	Find the symbol with the highest quotient and increment it
+		var q = 0, j = 0;
+		for (var i = 0; i < syms; i++) {
+			var thisq = symbols[i].freq / Math.sqrt(state.pdf[i] * (state.pdf[i] + 1));
+			if (thisq > q) {
+				q = thisq; j = i;
+			}
+		}
+		state.pdf[j]++; total++;
+	}
+	for (var i = 0; i < syms; i++) {
+		state.cdf.push(state.pdf[i] + state.cdf[i]);
+	}
+	state.muls = [];
+	state.logs = [];
+	for (var i = 0; i < syms; i++) {
+		state.logs.push(Math.ceil(state.MAXVAL * (8 - Math.log(state.pdf[i]) / Math.log(2)) / 32));
+		if (state.logs[i] < 1) state.logs[i] = 1;
+		if (state.logs[i] > state.MAXVAL - 1) state.logs[i] = state.MAXVAL - 1;
+		state.muls.push(Math.ceil(65536 / state.pdf[i]) / 256);
+	}
+}
+const codecArithD = {
+	encodeStart: codecArithDStart,
 	encodeStep: function(input, state, output) {
-		output.push(input);
+		if (state.logacc >= state.MAXVAL) {
+			//	0.32 fixed point format
+			state.accum = Math.ceil(state.accum * 0x1000000);
+			output.push(state.accum & 0xff); state.accum >>>= 8;
+			output.push(state.accum & 0xff); state.accum >>>= 8;
+			output.push(state.accum & 0xff); state.accum >>>= 8;
+			output.push(state.accum & 0xff); state.accum = 0;
+			state.divisor = 1;
+			state.logacc = state.LOGDEF;
+		}
+		state.accum += state.cdf[input] * state.divisor;
+		if (state.accum >= 256) {
+			debugger;
+		}
+		state.logacc += state.logs[input];
+		state.divisor /= state.muls[input];
 	},
 	encodeEnd: function(state, output) {
-		return;
+		state.accum = Math.ceil(state.accum * 0x1000000);
+		output.push(state.accum & 0xff); state.accum >>>= 8;
+		output.push(state.accum & 0xff); state.accum >>>= 8;
+		output.push(state.accum & 0xff); state.accum >>>= 8;
+		output.push(state.accum & 0xff);
 	},
 	decodeStart: function(state, symbols) {
-		return;
+		codecArithDStart(state, symbols);
+		state.logacc = state.MAXVAL;
 	},
 	decodeStep: function(input, state) {
-		return input.next().value[1];
+		if (state.logacc >= state.MAXVAL) {
+			//	Get new DWORD to decode
+			state.accum = 0;
+			state.logacc = state.LOGDEF;
+			for (var i = 0; i < 4; i++) {
+				var b = input.next();
+				if (b.done)
+					break;
+				else
+					b = b.value[1];
+				state.accum = (state.accum / 256) + (b & 0xff);
+			}
+		}
+		var output = -1;
+		for (var i = state.cdf.length - 2; i >= 0; i--) {
+			if (state.accum >= state.cdf[i]) {
+				output = i;
+				break;
+			}
+		}
+		state.accum -= state.cdf[output];
+		state.accum *= state.muls[output];
+		state.logacc += state.logs[output];
+		return output;
 	}
 };
-*/
 
 
 /**	Arithmetic encoder, fixed probability  */
@@ -1231,8 +1305,8 @@ const codecArithFixed = {
 		state.byte		= 0;
 		state.bit		= 0;
 		state.cdf = [0];
-		for (var i = 1; i < state.ACODER_N + 1; i++) {
-			state.cdf.push(symbols[i - 1].freq + state.cdf[i - 1]);
+		for (var i = 0; i < state.ACODER_N; i++) {
+			state.cdf.push(symbols[i].freq + state.cdf[i]);
 		}
 		while (state.cdf[state.cdf.length - 1] >= state.MAX_SCALE) {
 			//	Clamp everything to reasonable values

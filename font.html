@@ -179,34 +179,54 @@ table {
 		<img src="FontGuide2.png" alt="Ending Detail" width="307" height="220">
 	  </p>
 	  <p>The left edge of the image is discarded, up to the first fiducial, which marks the zeroth column of the zeroth character.  The next fiducial marks the zeroth column of the next character, and so on.  Image height is taken as character height, uniform for the whole font.  Make sure to crop the image so that no ascenders or descenders are accidentally cut off&mdash;few letters use the full box, check carefully!</p>
-	  <p>The fiducial is always <span class="tt" id="colorvalue">#ff0000</span> (<span id="colorname">red</span>).  It is translated to white (<span class="tt">#ffffff</span>).  The vertical position of the fiducial doesn't matter, nor the number of pixels in the column colored that way.  (TODO: make some way to encode grayscale under the fiducial?)  All other colors: the average ((R + G + B) / 3) is used.  Alpha is not used.  Output is up to 16 shades of grayscale.</p>
-	  <h2>Output File Format</h2>
-	  <ul>
-		<li>TBD</li>
-	  </ul>
-	  <h2>Options, Notes</h2>
-	  <p><b>Text format:</b> Includes statistics on font metrics, encoding efficiency (compression), etc.</p>
-	  <p><b>C header format:</b> Header contents are <span class="tt">#define</span>d.  All BYTEs are uint8_t, WORDs are uint16_t, etc.</p>
-	  <p>Only the header is given above; the accompanying C code to use it is as follows (as an avr-gcc ROM declaration):</p>
+	  <p>The fiducial is any pixel colored with unequal amounts of R, G and B.  The red channel is used for that pixel's grayscale value.  Red (<span class="tt">#ff0000</span>) is recommended for full-white pixels, and blue (<span class="tt">#0000ff</span>), green (<span class="tt">#00ff00</span>), etc. for full black.  Values inbetween (i.e., <span class="tt">#[x]00[y]</span> where x &isin; [0, 0xff] and y = 0xff - x) are recommended to represent other levels of grayscale.  Red or blue is likely easiest to draw, but this solution is provided for maximum flexibility.  The vertical position of the fiducial doesn't matter, nor the number of pixels in the column colored this way.  Any alpha channel is ignored.  Output supports at least 16 shades of grayscale.  (Some codecs may allow more shades; a warning is emitted when fewer colors are used, as a reminder that most codecs are optimized for 16.)</p>
+	  <h2>Notes</h2>
+	  <p><b>Encoder:</b> Select from various encoders (codecs).  These are listed at the bottom of this file (view source, find the <span class="tt">ALL_CODECS</span> declaration).</p>
+	  <p><b>Direction and Grouping:</b> raster ordering of the graphics sent to the encoder.  Rows are drawn left-to-right and columns top-to-bottom, unless labeled otherwise.  <b>Individual Rows:</b> each character is effectively sliced into sub-characters of height 1; this may be helpful for certain adapters that can only draw rows of pixels at a time.  Downside: such sub-chars compress very poorly, while header/meta data grows significantly.</p>
+	  <p><b>Metadata:</b> byte packing and other features; any options that are implemented in this tool, that don't fit into a codec's internal header data.  (Possible future consideration: store these options in the codec itself, so they aren't limited to just what's implemented here / common to all codecs.  Hmm, would be nice to read color limitations this way as well.)</p>
+	  <p><b>File name:</b> output filename to download.  Also used to generate the header label names.  (For headers, name is set to uppercase; non-naming characters are set to underscores, including punctuation and extended characters&mdash;sorry Unicode users.)</p>
+	  <p><b>Output Format, Text:</b> Includes statistics on font metrics, encoding efficiency (compression), etc.</p>
+	  <p><b>C Header:</b> Header contents are <span class="tt">#define</span>d.  All BYTEs are <span class="tt">uint8_t</span>, WORDs are <span class="tt">uint16_t</span>, etc.</p>
+	  <p>Only the data header is created; the accompanying C code to use it is as follows (as an avr-gcc ROM declaration).  Note that several <span class="tt">#define</span>s go unused; they are informational, and should be written into the decoder, whether assumed or asserted by it.  Alternately the struct can be expanded to include such data (at expense to storage and code size).</p>
 <pre class="ex">
 #include "Header_Name.h"
 
-#ifdef HEADER_NAME_H_INCLUDED
-//  Place this at the top, or in the common header file:
-const uint8_t ImageData[HEADER_NAME_TOTAL_LEN];
+typedef struct font_s {
+	uint8_t startChar;
+	uint8_t endChar;
+	uint8_t height;
+	const uint8_t* widths;
+	const uint8_t* lengths;
+	const uint8_t* data;
+} font_t;
 
-//  Reference this with: drawImage(ImageData, x, y);
-const uint8_t ImageData[] PROGMEM = {
-	(HEADER_NAME_PALETTE_LEN & 0x00ff),
-	HEADER_NAME_PAL,
-	HEADER_NAME_CMDS
+const uint8_t FontNameData[HEADER_NAME_DATA_SIZE];
+const uint8_t FontNameWidths[HEADER_NAME_WIDTHS_SIZE];
+const uint8_t FontNameLengths[HEADER_NAME_LENGTHS_SIZE];
+const font_t FontNameHeader;
+
+const uint8_t FontNameData[] PROGMEM = {
+	HEADER_NAME_FONT_DATA
 };
-#endif // HEADER_NAME_H_INCLUDED
+const uint8_t FontNameWidths[] PROGMEM = {
+	HEADER_NAME_CHAR_WIDTHS
+};
+const uint8_t FontNameLengths[] PROGMEM = {
+	HEADER_NAME_DATA_LENGTHS
+};
+const font_t FontNameHeader PROGMEM = {
+	.startChar	= HEADER_NAME_START_CODE,
+	.endChar	= HEADER_NAME_END_CODE,
+	.height		= HEADER_NAME_HEIGHT,
+	.widths		= FontNameWidths,
+	.lengths	= FontNameLengths,
+	.data		= FontNameData
+};
 </pre>
-	  <p><b>Execution speed:</b> Graphics writes tend to dominate, particularly via serial (SPI or other).  For display controllers with a set-draw-window command having single pixel resolution, whole characters can be drawn at a time, without too much overhead (one window command per character).  If the window can be filled in vertical columns, one window command for a whole line of characters may even do.  If pixels can only be written row-wise, then characters also must be drawn a row at a time, and the font has to be encoded by rows rather than blocks.</p>
-	  <p><b>Compression/Encoding:</b> .</p>
-	  <h2>Future Improvements, Speculation</h2>
-	  <p>Foo?</p>
+	  <p>C implementations of these codecs are not available unfortunately.</p>
+	  <p><b>Binary:</b> No file format is defined as of yet; binary output is not implemented.</p>
+	  <p><a href="https://github.com/T3sl4co1l/fontenc">Github repository</a></p>
+	  <p><a href="https://seventransistorlabs.com/Calc/">Calculators | Seven Transistor Labs</a></p>
 	</div>
 	<script src="FileSaver.min.js"></script>
 	<script><!--
@@ -234,9 +254,6 @@ var fileName = '';
 const MIN_COLORS	= 3;			//	Minimum number of colors: needs at least black, white and fid
 const MAX_COLORS	= 17;			//	Warning threshold
 const ERR_COLORS	= 256;			//	Number of colors to fault out immediately
-const FID_COLOR		= 0x0000ff;		//	Fiducial mark, hex value
-const FID_VALUE		= '#ff0000';	//	Fiducial mark, HTML value (also used to update HTML text)
-const FID_NAME		= 'red';		//	Fiducial mark, English name (also used to update HTML text)
 
 document.getElementById('submit').addEventListener('click', processFile, true);
 document.getElementById('download').addEventListener('click', downloadOutput, true);
@@ -245,8 +262,6 @@ document.getElementsByName('outputtype').forEach(n => n.addEventListener('click'
 document.getElementById('packwidths').addEventListener('click', setOutputData, true);
 document.getElementById('packlengths').addEventListener('click', setOutputData, true);
 document.getElementById('filenamebox').addEventListener('change', setOutputData, true);
-document.getElementById('colorvalue').innerHTML = FID_VALUE;
-document.getElementById('colorname').innerHTML = FID_NAME;
 document.getElementById('characterbox').addEventListener('change', viewChar, true);
 document.getElementById('characterzoom').addEventListener('change', viewChar, true);
 
@@ -348,18 +363,12 @@ function setOutputData() {
 
 		for (var y = 0; y < imgHeight; y++) {
 
-			//	Detect fiducials, translate to white pixels
-			if (imgArray[x + y * imgWidth] == FID_COLOR) {
-				imgData[x + y * imgWidth] = (255 << 16) + (255 << 8) + 255;
+			if (imgArray[x + y * imgWidth] % 0x010101 != 0) {
+				//	Non-gray: detected fiducial
 				fid = true;
-			} else {
-				//	Convert to grayscale (average channels)
-				imgData[x + y * imgWidth] = Math.floor( (
-						   (imgArray[x + y * imgWidth] & 0xff)
-						+ ((imgArray[x + y * imgWidth] >>> 8) & 0xff)
-						+ ((imgArray[x + y * imgWidth] >>> 16) & 0xff)
-						) / 3);
 			}
+			//	Convert to grayscale (take red channel)
+			imgData[x + y * imgWidth] = (imgArray[x + y * imgWidth] >> 0) & 0xff;
 
 			var o = colors.get(imgData[x + y * imgWidth]);
 			if (o === undefined) {
@@ -394,7 +403,7 @@ function setOutputData() {
 		document.getElementById('inputwarning').innerHTML = 'Warning: not enough colors present.<br>\n';
 	}
 	if (charStarts.length < 1) {
-		document.getElementById('inputwarning').innerHTML += 'Warning: no ' + FID_NAME + ' (' + FID_VALUE + ') markers found.<br>\n';
+		document.getElementById('inputwarning').innerHTML += 'Warning: no fiducial markers found.<br>\n';
 	}
 
 	/*
